@@ -71,6 +71,15 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
   };
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  // Touch support
+  const [isTouchDragging, setIsTouchDragging] = useState(false);
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [touchPhotoStart, setTouchPhotoStart] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   const CANVAS_WIDTH = 800;
   const CANVAS_HEIGHT = 800;
@@ -128,17 +137,13 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   const handleMouseDown = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!photoImage) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const rect = canvas.getBoundingClientRect();
     const scaleX = CANVAS_WIDTH / rect.width;
     const scaleY = CANVAS_HEIGHT / rect.height;
-
     const mouseX = (event.clientX - rect.left) * scaleX;
     const mouseY = (event.clientY - rect.top) * scaleY;
-
     setIsDragging(true);
     setDragStart({
       x: mouseX - photoTransform.x,
@@ -148,17 +153,13 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   const handleMouseMove = (event: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDragging || !photoImage) return;
-
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const rect = canvas.getBoundingClientRect();
     const scaleX = CANVAS_WIDTH / rect.width;
     const scaleY = CANVAS_HEIGHT / rect.height;
-
     const mouseX = (event.clientX - rect.left) * scaleX;
     const mouseY = (event.clientY - rect.top) * scaleY;
-
     setPhotoTransform((prev) => ({
       ...prev,
       x: mouseX - dragStart.x,
@@ -168,6 +169,49 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   const handleMouseUp = () => {
     setIsDragging(false);
+  };
+
+  // Touch event handlers
+  const handleTouchStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!photoImage) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = CANVAS_WIDTH / rect.width;
+    const scaleY = CANVAS_HEIGHT / rect.height;
+    const touch = event.touches[0];
+    const touchX = (touch.clientX - rect.left) * scaleX;
+    const touchY = (touch.clientY - rect.top) * scaleY;
+    setIsTouchDragging(true);
+    setTouchStart({ x: touchX, y: touchY });
+    setTouchPhotoStart({ x: photoTransform.x, y: photoTransform.y });
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isTouchDragging || !photoImage || !touchStart || !touchPhotoStart)
+      return;
+    event.preventDefault(); // Prevent scrolling
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = CANVAS_WIDTH / rect.width;
+    const scaleY = CANVAS_HEIGHT / rect.height;
+    const touch = event.touches[0];
+    const touchX = (touch.clientX - rect.left) * scaleX;
+    const touchY = (touch.clientY - rect.top) * scaleY;
+    const dx = touchX - touchStart.x;
+    const dy = touchY - touchStart.y;
+    setPhotoTransform((prev) => ({
+      ...prev,
+      x: touchPhotoStart.x + dx,
+      y: touchPhotoStart.y + dy,
+    }));
+  };
+
+  const handleTouchEnd = () => {
+    setIsTouchDragging(false);
+    setTouchStart(null);
+    setTouchPhotoStart(null);
   };
 
   const handleScaleChange = (delta: number) => {
@@ -334,12 +378,15 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             ref={canvasRef}
             width={CANVAS_WIDTH}
             height={CANVAS_HEIGHT}
-            className="max-w-full h-auto cursor-move"
+            className="max-w-full h-auto cursor-move touch-none"
             style={{ maxHeight: "400px" }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           />
         </div>
 
