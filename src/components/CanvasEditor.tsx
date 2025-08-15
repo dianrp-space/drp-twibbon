@@ -1,3 +1,39 @@
+// Touch event handlers for mobile
+const handleTouchStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
+  if (!photoImage) return;
+  const canvas = canvasRef.current;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = CANVAS_WIDTH / rect.width;
+  const scaleY = CANVAS_HEIGHT / rect.height;
+  const touch = event.touches[0];
+  const touchX = (touch.clientX - rect.left) * scaleX;
+  const touchY = (touch.clientY - rect.top) * scaleY;
+  setIsDragging(true);
+  setDragStart({ x: touchX - photoTransform.x, y: touchY - photoTransform.y });
+};
+
+const handleTouchMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
+  if (!isDragging || !photoImage) return;
+  const canvas = canvasRef.current;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = CANVAS_WIDTH / rect.width;
+  const scaleY = CANVAS_HEIGHT / rect.height;
+  const touch = event.touches[0];
+  const touchX = (touch.clientX - rect.left) * scaleX;
+  const touchY = (touch.clientY - rect.top) * scaleY;
+  setPhotoTransform((prev: PhotoTransform) => ({
+    ...prev,
+    x: touchX - dragStart.x,
+    y: touchY - dragStart.y,
+  }));
+  event.preventDefault();
+};
+
+const handleTouchEnd = () => {
+  setIsDragging(false);
+};
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import ImageUploader from "./ImageUploader";
 import { Download, RotateCcw, Move, ZoomIn, ZoomOut } from "lucide-react";
@@ -340,6 +376,9 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           />
         </div>
 
