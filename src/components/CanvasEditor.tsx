@@ -80,6 +80,12 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     x: number;
     y: number;
   } | null>(null);
+  // Pinch zoom support
+  const [isPinching, setIsPinching] = useState(false);
+  const [initialPinchDistance, setInitialPinchDistance] = useState<
+    number | null
+  >(null);
+  const [initialScale, setInitialScale] = useState<number>(1);
 
   const CANVAS_WIDTH = 800;
   const CANVAS_HEIGHT = 800;
@@ -176,42 +182,82 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
     if (!photoImage) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = CANVAS_WIDTH / rect.width;
-    const scaleY = CANVAS_HEIGHT / rect.height;
-    const touch = event.touches[0];
-    const touchX = (touch.clientX - rect.left) * scaleX;
-    const touchY = (touch.clientY - rect.top) * scaleY;
-    setIsTouchDragging(true);
-    setTouchStart({ x: touchX, y: touchY });
-    setTouchPhotoStart({ x: photoTransform.x, y: photoTransform.y });
+    if (event.touches.length === 1) {
+      // Drag
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = CANVAS_WIDTH / rect.width;
+      const scaleY = CANVAS_HEIGHT / rect.height;
+      const touch = event.touches[0];
+      const touchX = (touch.clientX - rect.left) * scaleX;
+      const touchY = (touch.clientY - rect.top) * scaleY;
+      setIsTouchDragging(true);
+      setTouchStart({ x: touchX, y: touchY });
+      setTouchPhotoStart({ x: photoTransform.x, y: photoTransform.y });
+    } else if (event.touches.length === 2) {
+      // Pinch zoom
+      setIsPinching(true);
+      const touch1 = event.touches[0];
+      const touch2 = event.touches[1];
+      const dist = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      setInitialPinchDistance(dist);
+      setInitialScale(photoTransform.scale);
+    }
   };
 
   const handleTouchMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isTouchDragging || !photoImage || !touchStart || !touchPhotoStart)
-      return;
+    if (!photoImage) return;
     event.preventDefault(); // Prevent scrolling
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = CANVAS_WIDTH / rect.width;
-    const scaleY = CANVAS_HEIGHT / rect.height;
-    const touch = event.touches[0];
-    const touchX = (touch.clientX - rect.left) * scaleX;
-    const touchY = (touch.clientY - rect.top) * scaleY;
-    const dx = touchX - touchStart.x;
-    const dy = touchY - touchStart.y;
-    setPhotoTransform((prev) => ({
-      ...prev,
-      x: touchPhotoStart.x + dx,
-      y: touchPhotoStart.y + dy,
-    }));
+    if (
+      event.touches.length === 1 &&
+      isTouchDragging &&
+      touchStart &&
+      touchPhotoStart
+    ) {
+      // Drag
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = CANVAS_WIDTH / rect.width;
+      const scaleY = CANVAS_HEIGHT / rect.height;
+      const touch = event.touches[0];
+      const touchX = (touch.clientX - rect.left) * scaleX;
+      const touchY = (touch.clientY - rect.top) * scaleY;
+      const dx = touchX - touchStart.x;
+      const dy = touchY - touchStart.y;
+      setPhotoTransform((prev) => ({
+        ...prev,
+        x: touchPhotoStart.x + dx,
+        y: touchPhotoStart.y + dy,
+      }));
+    } else if (
+      event.touches.length === 2 &&
+      isPinching &&
+      initialPinchDistance
+    ) {
+      // Pinch zoom
+      const touch1 = event.touches[0];
+      const touch2 = event.touches[1];
+      const dist = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      const scaleChange = dist / initialPinchDistance;
+      setPhotoTransform((prev) => ({
+        ...prev,
+        scale: Math.max(0.1, Math.min(3, initialScale * scaleChange)),
+      }));
+    }
   };
 
   const handleTouchEnd = () => {
     setIsTouchDragging(false);
     setTouchStart(null);
     setTouchPhotoStart(null);
+    setIsPinching(false);
+    setInitialPinchDistance(null);
   };
 
   const handleScaleChange = (delta: number) => {
@@ -432,103 +478,6 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 disabled={!photoImage}
               />
             </div>
-          </div>
-          {/* Slider untuk posisi X dan Y */}
-          <div className="flex flex-col gap-2 mt-2">
-            <label className="block text-sm font-medium text-gray-700">
-              <span className="font-bold text-lg">
-                Gunakan Slider atau Panah dibawah ini untuk Geser Posisi Foto
-                Kamu
-              </span>
-
-              <p>Geser Horizontal (Kanan/Kiri): {photoTransform.x}</p>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="800"
-              value={photoTransform.x}
-              onChange={(e) =>
-                setPhotoTransform((prev) => ({
-                  ...prev,
-                  x: parseInt(e.target.value),
-                }))
-              }
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              disabled={!photoImage}
-            />
-            <label className="block text-sm font-medium text-gray-700">
-              Geser Vertikal (Atas/Bawah): {photoTransform.y}
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="800"
-              value={photoTransform.y}
-              onChange={(e) =>
-                setPhotoTransform((prev) => ({
-                  ...prev,
-                  y: parseInt(e.target.value),
-                }))
-              }
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              disabled={!photoImage}
-            />
-          </div>
-          {/* Tombol panah */}
-          <div className="flex justify-center gap-2 mt-2">
-            <button
-              className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
-              onClick={() =>
-                setPhotoTransform((prev) => ({
-                  ...prev,
-                  y: Math.max(0, prev.y - 10),
-                }))
-              }
-              disabled={!photoImage}
-              aria-label="Geser atas"
-            >
-              ↑
-            </button>
-            <button
-              className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
-              onClick={() =>
-                setPhotoTransform((prev) => ({
-                  ...prev,
-                  x: Math.max(0, prev.x - 10),
-                }))
-              }
-              disabled={!photoImage}
-              aria-label="Geser kiri"
-            >
-              ←
-            </button>
-            <button
-              className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
-              onClick={() =>
-                setPhotoTransform((prev) => ({
-                  ...prev,
-                  x: Math.min(800, prev.x + 10),
-                }))
-              }
-              disabled={!photoImage}
-              aria-label="Geser kanan"
-            >
-              →
-            </button>
-            <button
-              className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
-              onClick={() =>
-                setPhotoTransform((prev) => ({
-                  ...prev,
-                  y: Math.min(800, prev.y + 10),
-                }))
-              }
-              disabled={!photoImage}
-              aria-label="Geser bawah"
-            >
-              ↓
-            </button>
           </div>
         </div>
 
