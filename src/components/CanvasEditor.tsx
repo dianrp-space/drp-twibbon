@@ -1,39 +1,3 @@
-// Touch event handlers for mobile
-const handleTouchStart = (event: React.TouchEvent<HTMLCanvasElement>) => {
-  if (!photoImage) return;
-  const canvas = canvasRef.current;
-  if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = CANVAS_WIDTH / rect.width;
-  const scaleY = CANVAS_HEIGHT / rect.height;
-  const touch = event.touches[0];
-  const touchX = (touch.clientX - rect.left) * scaleX;
-  const touchY = (touch.clientY - rect.top) * scaleY;
-  setIsDragging(true);
-  setDragStart({ x: touchX - photoTransform.x, y: touchY - photoTransform.y });
-};
-
-const handleTouchMove = (event: React.TouchEvent<HTMLCanvasElement>) => {
-  if (!isDragging || !photoImage) return;
-  const canvas = canvasRef.current;
-  if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = CANVAS_WIDTH / rect.width;
-  const scaleY = CANVAS_HEIGHT / rect.height;
-  const touch = event.touches[0];
-  const touchX = (touch.clientX - rect.left) * scaleX;
-  const touchY = (touch.clientY - rect.top) * scaleY;
-  setPhotoTransform((prev: PhotoTransform) => ({
-    ...prev,
-    x: touchX - dragStart.x,
-    y: touchY - dragStart.y,
-  }));
-  event.preventDefault();
-};
-
-const handleTouchEnd = () => {
-  setIsDragging(false);
-};
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import ImageUploader from "./ImageUploader";
 import { Download, RotateCcw, Move, ZoomIn, ZoomOut } from "lucide-react";
@@ -376,52 +340,148 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
           />
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Scale: {(photoTransform.scale * 100).toFixed(0)}%
+        <div className="flex flex-col gap-4 w-full max-w-md">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Scale: {(photoTransform.scale * 100).toFixed(0)}%
+              </label>
+              <input
+                type="range"
+                min="0.1"
+                max="3"
+                step="0.1"
+                value={photoTransform.scale}
+                onChange={(e) =>
+                  setPhotoTransform((prev) => ({
+                    ...prev,
+                    scale: parseFloat(e.target.value),
+                  }))
+                }
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                disabled={!photoImage}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Rotation: {photoTransform.rotation}°
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                step="15"
+                value={photoTransform.rotation}
+                onChange={(e) =>
+                  setPhotoTransform((prev) => ({
+                    ...prev,
+                    rotation: parseInt(e.target.value),
+                  }))
+                }
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                disabled={!photoImage}
+              />
+            </div>
+          </div>
+          {/* Slider untuk posisi X dan Y */}
+          <div className="flex flex-col gap-2 mt-2">
+            <label className="block text-sm font-medium text-gray-700">
+              <span className="font-bold text-lg">
+                Gunakan Slider atau Panah dibawah ini untuk Geser Posisi Foto
+                Kamu
+              </span>
+
+              <p>Geser Horizontal (Kanan/Kiri): {photoTransform.x}</p>
             </label>
             <input
               type="range"
-              min="0.1"
-              max="3"
-              step="0.1"
-              value={photoTransform.scale}
+              min="0"
+              max="800"
+              value={photoTransform.x}
               onChange={(e) =>
                 setPhotoTransform((prev) => ({
                   ...prev,
-                  scale: parseFloat(e.target.value),
+                  x: parseInt(e.target.value),
+                }))
+              }
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              disabled={!photoImage}
+            />
+            <label className="block text-sm font-medium text-gray-700">
+              Geser Vertikal (Atas/Bawah): {photoTransform.y}
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="800"
+              value={photoTransform.y}
+              onChange={(e) =>
+                setPhotoTransform((prev) => ({
+                  ...prev,
+                  y: parseInt(e.target.value),
                 }))
               }
               className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               disabled={!photoImage}
             />
           </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Rotation: {photoTransform.rotation}°
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="360"
-              step="15"
-              value={photoTransform.rotation}
-              onChange={(e) =>
+          {/* Tombol panah */}
+          <div className="flex justify-center gap-2 mt-2">
+            <button
+              className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
+              onClick={() =>
                 setPhotoTransform((prev) => ({
                   ...prev,
-                  rotation: parseInt(e.target.value),
+                  y: Math.max(0, prev.y - 10),
                 }))
               }
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               disabled={!photoImage}
-            />
+              aria-label="Geser atas"
+            >
+              ↑
+            </button>
+            <button
+              className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
+              onClick={() =>
+                setPhotoTransform((prev) => ({
+                  ...prev,
+                  x: Math.max(0, prev.x - 10),
+                }))
+              }
+              disabled={!photoImage}
+              aria-label="Geser kiri"
+            >
+              ←
+            </button>
+            <button
+              className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
+              onClick={() =>
+                setPhotoTransform((prev) => ({
+                  ...prev,
+                  x: Math.min(800, prev.x + 10),
+                }))
+              }
+              disabled={!photoImage}
+              aria-label="Geser kanan"
+            >
+              →
+            </button>
+            <button
+              className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"
+              onClick={() =>
+                setPhotoTransform((prev) => ({
+                  ...prev,
+                  y: Math.min(800, prev.y + 10),
+                }))
+              }
+              disabled={!photoImage}
+              aria-label="Geser bawah"
+            >
+              ↓
+            </button>
           </div>
         </div>
 
